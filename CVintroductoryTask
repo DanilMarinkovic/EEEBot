@@ -1,0 +1,57 @@
+#include <iostream>
+#include "opencv2/core.hpp"
+#include "opencv2/highgui.hpp"
+#include "opencv2/imgproc.hpp"
+
+using namespace cv;
+using namespace std;
+
+int main()
+{
+    Mat Photo, Photo_HSV, Photo_Blue, Photo_Green, Photo_Red, Photo_BlueMorphed, Photo_RedMorphed, Photo_GreenMorphed;
+    Photo = imread("GreenCar.bmp");
+
+
+    imshow("Photo", Photo);
+
+    cvtColor(Photo, Photo_HSV, COLOR_BGR2HSV); // Convert the image to HSV
+    Mat kernel = cv::getStructuringElement(MORPH_ELLIPSE, Size(9, 9));
+
+    inRange(Photo_HSV, Scalar(90, 50, 50), Scalar(120, 255, 255), Photo_Blue); // Converts the image to blue
+    //imshow("Photo Blue", Photo_Blue);
+    cv::morphologyEx(Photo_Blue, Photo_BlueMorphed, MORPH_OPEN, kernel);
+    //imshow("Blue Morphed", Photo_BlueMorphed);
+    int BluePixels=0;
+    BluePixels=countNonZero(Photo_BlueMorphed);
+    //printf("\nThe number of blue pixels is: %d", BluePixels);
+
+
+
+    inRange(Photo_HSV, Scalar(0, 100, 0), Scalar(30, 255, 255), Photo_Red); // Converts the image to blue
+    //imshow("Photo Red", Photo_Red);
+    cv::morphologyEx(Photo_Red, Photo_RedMorphed, MORPH_OPEN, kernel);
+    //imshow("Red Morphed", Photo_RedMorphed);
+    int RedPixels=0;
+    RedPixels=countNonZero(Photo_RedMorphed);
+    //printf("\nThe number of red pixels is: %d", RedPixels);
+
+    inRange(Photo_HSV, Scalar(10, 30, 30), Scalar(70, 170, 225), Photo_Green); // Converts the image to blue
+    //imshow("Photo Green", Photo_Green);
+    cv::morphologyEx(Photo_Green, Photo_GreenMorphed, MORPH_OPEN, kernel);
+    //imshow("Green Morphed", Photo_GreenMorphed);
+    int GreenPixels=0;
+    GreenPixels=countNonZero(Photo_GreenMorphed);
+    //printf("\nThe number of green pixels is: %d", GreenPixels);
+
+    if (RedPixels>GreenPixels && RedPixels>BluePixels)
+        printf("\nThe main colour in the image is red.");
+    else if (GreenPixels>RedPixels && GreenPixels>BluePixels)
+        printf("\nThe main colour in the image is green.");
+    else if (BluePixels>RedPixels && BluePixels>GreenPixels)
+        printf("\nThe main colour in the image is blue.");
+
+
+        waitKey(0); // Wait indefinitely for a key press
+
+    return 0;
+}
