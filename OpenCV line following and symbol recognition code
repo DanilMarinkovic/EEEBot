@@ -1,0 +1,320 @@
+#include <opencv2/opencv.hpp>
+#include "opencv_aee.hpp" // Ensure this header defines all the necessary functions
+#include "main.hpp"       // For declared values and functions
+#include "pi2c.h"
+
+//Pi2c car(0x22); // Configure the I2C interface to the Car as a global variable
+
+void setup(void)
+{
+    setupCamera(320, 240); // Enable the camera for OpenCV
+}
+float greatestvalue;
+float TriangleMatch;
+float CircleMatch;
+float UmbrellaMatch;
+float StarMatch;
+float Symbol;
+
+int numNonZero1 = 0; // Create a integer to store the result
+int numNonZero2 = 0; // Create a integer to store the result
+int numNonZero3 = 0; // Create a integer to store the result
+int numNonZero4 = 0; // Create a integer to store the result
+int numNonZero5 = 0; // Create a integer to store the result
+int numNonZero6 = 0; // Create a integer to store the result
+int numNonZero7 = 0; // Create a integer to store the result
+int numNonZero8 = 0; // Create a integer to store the result
+
+
+
+int main(int argc, char** argv)
+{
+    setup(); // Call a setup function to prepare IO and devices
+
+   // cv::namedWindow("Photo"); // Create a GUI window called photo
+    int GLH=40, GLS=60, GLV=60, GHH=80, GHS=255, GHV=100; //Green hue, saturation and  value
+    int RLH=0, RLS=16, RLV= 10, RHH=30, RHS=255, RHV=255; //red hue, saturation and  value
+    int BLH=100,BLS=60,BLV=60,BHH=120,BHS=255,BHV=255;//blue hue, saturation and  value
+    int LH=0, LS=40, LV=15, HH=179, HS=120, HV=100; //black HSV values
+    Mat TriangleImage, StarImage,CircleImage,UmbrellaImage;
+    Mat TriangleImageBlack, StarImageBlack, CircleImageBlack, UmbrellaImageBlack;
+    Mat transformed;
+    Mat frame_HSVmb;
+
+    cv::Mat frame;
+    cv::Mat Pink;
+    cv::Mat frame_HSV;
+
+
+
+
+
+
+    //Mat PinkKernel;
+    //Mat kernel = cv::getStructuringElement(MORPH_ELLIPSE, Size(1, 1));
+
+    TriangleImage= imread("Triangle (Blue Line).png");
+
+    //imshow("TriangleImage", TriangleImage);
+
+    cvtColor(TriangleImage, TriangleImageBlack, cv::COLOR_BGR2HSV);
+    inRange(TriangleImageBlack, cv::Scalar(130, 35, 30), cv::Scalar(170,255, 255), TriangleImageBlack);
+    // imshow("TriangleImage", TriangleImageBlack);
+
+
+
+    CircleImage= imread("Circle (Red Line).png");
+
+
+    //imshow("CircleImage", CircleImage);
+
+    cvtColor(CircleImage, CircleImageBlack, cv::COLOR_BGR2HSV);
+    inRange(CircleImageBlack, cv::Scalar(130, 35, 30), cv::Scalar(170,255, 255), CircleImageBlack);
+    //imshow("CircleImageBlack", CircleImageBlack);
+
+
+    StarImage= imread("Star (Green Line).png");
+    cvtColor(StarImage, StarImageBlack, cv::COLOR_BGR2HSV);
+    inRange(StarImageBlack, cv::Scalar(130, 35, 30), cv::Scalar(170,255, 255), StarImageBlack);
+    // imshow("StarImageBlack", StarImageBlack);
+
+    UmbrellaImage= imread("Umbrella (Yellow Line).png");
+    cvtColor(UmbrellaImage, UmbrellaImageBlack, cv::COLOR_BGR2HSV);
+    inRange(UmbrellaImageBlack, cv::Scalar(130, 35, 30), cv::Scalar(170,255, 255), UmbrellaImageBlack);
+    //imshow("UmbrellaImageBlack", UmbrellaImageBlack);
+
+    while (true) // Main loop to perform image processing
+    {
+
+        frame = captureFrame(); // Capture a frame from the camera and store in a new matrix variable
+
+        if (!frame.empty())
+        {
+
+
+
+            cvtColor(frame, Pink, cv::COLOR_BGR2HSV);
+            inRange(Pink, cv::Scalar(130, 35, 30), cv::Scalar(170,255, 255), Pink);
+
+            // cv::morphologyEx(Pink, PinkKernel, MORPH_OPEN, kernel);
+
+            cv::namedWindow("Pink");
+              cv::imshow("Pink",Pink);
+            int PinkPixels=0;
+            PinkPixels=countNonZero(Pink);
+            //printf("\nPink pixels: %d", PinkPixels);
+
+
+
+
+            std::vector< std::vector<cv::Point> > contours; // Variable for list of contours
+            std::vector<Vec4i> hierarchy; // Variable for image topology data
+            cv::findContours(Pink, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE,Point(0, 0)); // Calculate the contours and store them
+            std::vector< std::vector<cv::Point> > approxedcontours(contours.size()); //Array for new contours
+            for(int i = 0; i < contours.size(); i++)
+            {
+                cv::approxPolyDP(contours[i],approxedcontours[i], 30, true); //Approximate the contour
+            }
+            for(int i = 0; i < approxedcontours.size(); i++) // Loop through the contours
+            {
+                drawContours( frame, approxedcontours, i, Scalar(0,0,255), 2, LINE_8,noArray(), 0,Point() ); // Draw each in red
+                // printf("\nApprox counter: %zu", approxedcontours[i].size());
+
+
+                if(approxedcontours[i].size()==4)
+                {
+                    transformed = transformPerspective( approxedcontours[i], Pink,350,350);
+
+                    if (transformed.cols>0)
+                    {
+                        imshow("transform",transformed);
+                        TriangleMatch= compareImages(transformed, TriangleImageBlack);    // Compare two images and return a percentage value related to the quality of match
+                        //  printf("\nTriangle match: %.1f", TriangleMatch);
+
+                        StarMatch= compareImages(transformed, StarImageBlack);    // Compare two images and return a percentage value related to the quality of match
+                        // printf("\nStar match: %.1f", StarMatch);
+
+                        CircleMatch= compareImages(transformed, CircleImageBlack);    // Compare two images and return a percentage value related to the quality of match
+                        // printf("\nCircle match: %.1f", CircleMatch);
+
+                        UmbrellaMatch= compareImages(transformed, UmbrellaImageBlack);    // Compare two images and return a percentage value related to the quality of match
+                        // printf("\nUmbrella match: %.1f", UmbrellaMatch);
+
+                    }
+
+                }
+
+
+
+                if(StarMatch > TriangleMatch && StarMatch > CircleMatch && StarMatch > UmbrellaMatch)
+                {
+                    printf("\nThe Symbol is Star");
+
+                }
+                if(CircleMatch > TriangleMatch && CircleMatch > StarMatch && CircleMatch > UmbrellaMatch && CircleMatch>60)
+                {
+                    printf("\nThe Symbol is Circle");
+                   /* LH=RHH;
+                    LS=RLS;
+                    LV=RLV;
+                    HH=RHH;
+                    HS=RHS;
+                    HV=RHV;*/
+                    //imshow("Line", frame_HSVmb);
+                }
+                if(UmbrellaMatch > TriangleMatch && UmbrellaMatch > CircleMatch && UmbrellaMatch > StarMatch)
+                {
+                    printf("\nThe Symbol is Umbrella");
+                }
+                if(TriangleMatch > StarMatch && TriangleMatch > CircleMatch && TriangleMatch > UmbrellaMatch)
+                {
+                    do
+                    {
+                        printf("\nThe Symbol is Triangle");
+                      /*  LH=100;
+                        LS=60;
+                        LV=60;
+                        HH=120;
+                        HS=255;
+                        HV=255;*/
+                       // imshow("Line", frame_HSVmb);
+                        //printf("\nPixels: %d", numNonZero4);
+                    }
+                    while(numNonZero1 &&numNonZero2 &&numNonZero3 &&numNonZero4 &&numNonZero5 &&numNonZero6 &&numNonZero7 &&numNonZero8 != 0);
+                }
+                else
+                {
+                    LH=0;
+                    LS=40;
+                    LV=15;
+                    HH=179;
+                    HS=120;
+                    HV=100;
+                   // imshow("Line", frame_HSVmb);
+                }
+
+//1-8 MEANING LEFT - RIGHT
+
+                cvtColor(frame, frame_HSV, cv::COLOR_BGR2HSV);
+                inRange(frame_HSV, cv::Scalar(GLH, GLS, GLV), cv::Scalar(GHH,GHS, GHV), frame_HSV);
+
+                cv::medianBlur(frame_HSV, frame_HSVmb, 11);
+                //imshow("Green line", frame_HSVmb);
+                imshow("Photo", frame);
+
+                Mat croppedImage1; // Create a matrix to store the cropped image
+                croppedImage1 = frame_HSVmb(Rect(0,30,40,30)); // Crop image and store the result in croppedImage. X,Y is the pixel coordinate of the top left corner
+                Mat croppedImage2; // Create a matrix to store the cropped image
+                croppedImage2 = frame_HSVmb(Rect(40,30,40,30)); // Crop image and store the result in croppedImage. X,Y is the pixel coordinate of the top left corner
+                Mat croppedImage3; // Create a matrix to store the cropped image
+                croppedImage3 = frame_HSVmb(Rect(80,30,40,30)); // Crop image and store the result in croppedImage. X,Y is the pixel coordinate of the top left corner
+                Mat croppedImage4; // Create a matrix to store the cropped image
+                croppedImage4 = frame_HSVmb(Rect(120,30,40,30)); // Crop image and store the result in croppedImage. X,Y is the pixel coordinate of the top left corner
+                Mat croppedImage5; // Create a matrix to store the cropped image
+                croppedImage5 = frame_HSVmb(Rect(160,30,40,30)); // Crop image and store the result in croppedImage. X,Y is the pixel coordinate of the top left corner
+                Mat croppedImage6; // Create a matrix to store the cropped image
+                croppedImage6 = frame_HSVmb(Rect(200,30,40,30)); // Crop image and store the result in croppedImage. X,Y is the pixel coordinate of the top left corner
+                Mat croppedImage7; // Create a matrix to store the cropped image
+                croppedImage7 = frame_HSVmb(Rect(240,30,40,30)); // Crop image and store the result in croppedImage. X,Y is the pixel coordinate of the top left corner
+                Mat croppedImage8; // Create a matrix to store the cropped image
+                croppedImage8 = frame_HSVmb(Rect(280,30,40,30)); // Crop image and store the result in croppedImage. X,Y is the pixel coordinate of the top left corner
+
+                //cv::hconcat(croppedImage1,croppedImage8, combinedImage); // Combine used to see how the camera is orientated
+                //cv::namedWindow("Photo");
+                // cv::imshow("Photo",frame); // Display the image in the window
+
+                /*
+                                        cv::namedWindow("Photo1");
+                            cv::imshow("Photo1",croppedImage2); // Display the image in the window
+
+                                        cv::namedWindow("Photo2");
+                            cv::imshow("Photo2",croppedImage3); // Display the image in the window
+
+                                        cv::namedWindow("Photo3");
+                            cv::imshow("Photo3",croppedImage4); // Display the image in the window
+
+                                        cv::namedWindow("Photo4");
+                            cv::imshow("Photo4",croppedImage5); // Display the image in the window
+
+                                        cv::namedWindow("Photo5");
+                            cv::imshow("Photo5",croppedImage6); // Display the image in the window
+
+                                        cv::namedWindow("Photo6");
+                            cv::imshow("Photo6",croppedImage7); // Display the image in the window
+
+                                        cv::namedWindow("Photo7");
+                            cv::imshow("Photo7",croppedImage8); // Display the image in the window
+
+                */
+
+                numNonZero1 = countNonZero(croppedImage1); // Count the number of non-zero pixels
+
+                numNonZero2 = countNonZero(croppedImage2); // Count the number of non-zero pixelsF
+
+                numNonZero3 = countNonZero(croppedImage3); // Count the number of non-zero pixels
+
+                numNonZero4 = countNonZero(croppedImage4); // Count the number of non-zero pixels
+
+                numNonZero5 = countNonZero(croppedImage5); // Count the number of non-zero pixels
+
+                numNonZero6 = countNonZero(croppedImage6); // Count the number of non-zero pixels
+
+                numNonZero7 = countNonZero(croppedImage7); // Count the number of non-zero pixels
+
+                numNonZero8 = countNonZero(croppedImage8); // Count the number of non-zero pixels
+
+
+
+
+                // Define the sensor readings and weights
+                const int sensorValues[8] = {numNonZero1,numNonZero2,numNonZero3,numNonZero4,numNonZero5,numNonZero6,numNonZero7,numNonZero8};
+                const int weights[8] = {-40,-30,-20,-10,10,20,30,40};
+
+                // Calculate the weighted sum and the sum of sensor values
+                float weightedSum = 0;
+                float sumOfValues = 0;
+                for (int i = 0; i < 8; i++)
+                {
+                    weightedSum += sensorValues[i] * weights[i];
+                    sumOfValues += sensorValues[i];
+                }
+
+
+                // Calculate the error
+
+                float Average;
+                if (sumOfValues != 0)   // Prevent division by zero
+                {
+                    Average = weightedSum / sumOfValues;
+
+
+                }
+               // printf("\nAverage: %f", Average);
+                Pi2c arduino(0x04);
+                arduino.i2cWriteArduinoInt(int (Average));
+
+            }
+
+        }
+        else
+        {
+            std::cerr << "ERROR: Unable to read camera image" << std::endl;
+            // Handle error or retry frame capture
+        }
+
+        int key = cv::waitKey(1); // Wait 1ms for a keypress (required to update windows)
+        key = (key==255) ? -1 : key;
+        if (key == 27) // Check if the ESC key has been pressed
+        {
+            break; // Exit the while loop if ESC is pressed
+        }
+    }
+
+    cv::destroyAllWindows(); // Close all the opened windows
+    closeCV(); // Disable the camera and close any windows
+
+    return 0;
+}
+
+
+
