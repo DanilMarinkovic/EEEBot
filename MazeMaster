@@ -1,0 +1,64 @@
+// Include necessary libraries for LCD and keypad
+#include <Keypad.h>
+#include <LiquidCrystal.h>
+#include <Wire.h>
+
+// LCD pin setup
+LiquidCrystal lcd(4, 2, 18, 19, 13, 15);
+
+// Keypad setup
+const byte ROWS = 4;
+const byte COLS = 3;
+char keys[ROWS][COLS] = {
+  {'1','2','3'},
+  {'4','5','6'},
+  {'7','8','9'},
+  {'*','0','#'}
+};
+byte rowPins[ROWS] = {32, 33, 25, 26};
+byte colPins[COLS] = {27, 14, 12};
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+String commandQueue = "";
+bool enteringCommand = true;
+
+void setup() {
+  Serial.begin(9600);
+  lcd.begin(16, 2);
+  Wire.begin(); // Start I2C as master
+  lcd.print("Enter Cmds:");
+}
+
+void loop() {
+  if (enteringCommand) {
+    char key = keypad.getKey();
+    if (key != NO_KEY) {
+      if (key == '#') {
+        enteringCommand = false;
+        lcd.clear();
+        lcd.print("Sending...");
+        Wire.beginTransmission(8); // Assuming the downstairs ESP32 is at address 8
+        Serial.println(commandQueue.c_str());
+        Wire.write(commandQueue.c_str()); // Send commandQueue as a string
+        Wire.endTransmission();
+        lcd.print("Cmds sent!");
+        delay(2000); // Wait a bit before resetting
+        commandQueue = "";
+        enteringCommand = true;
+        lcd.clear();
+        lcd.print("Enter Cmds:");
+      } else if (key == '*') {
+        if (commandQueue.length() > 0) {
+          commandQueue.remove(commandQueue.length() - 1);
+        }
+      } else {
+        commandQueue += key;
+      }
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Cmds: ");
+      lcd.setCursor(0, 1);
+      lcd.print(commandQueue);
+    }
+  }
+}
