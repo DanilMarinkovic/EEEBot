@@ -1,0 +1,165 @@
+#include <Wire.h>
+
+#define enA 33
+#define enB 25
+#define INa 26
+#define INb 27
+#define INc 14
+#define INd 12
+
+const int freq = 2000;
+const int ledChannelA = 0;
+const int ledChannelB = 1;
+const int resolution = 8;
+const int servoFrequency = 50;
+const int servoChannel = 2; // Servo channel for steering
+const int servoResolution = 12;
+
+int servoPin = 13; // Pin connected to the servo
+
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(INa, OUTPUT);
+  pinMode(INb, OUTPUT);
+  pinMode(INc, OUTPUT);
+  pinMode(INd, OUTPUT);
+
+  // Configure LED PWM functionalities
+  ledcSetup(ledChannelA, freq, resolution);
+  ledcSetup(ledChannelB, freq, resolution);
+  ledcSetup(servoChannel, servoFrequency, servoResolution);
+
+  // Attach the channels to the GPIOs to be controlled
+  ledcAttachPin(enA, ledChannelA);
+  ledcAttachPin(enB, ledChannelB);
+  ledcAttachPin(servoPin, servoChannel);
+
+  // Initialize I2C communication as a slave
+  Wire.begin(8);
+  Wire.onReceive(receiveEvent);
+
+  Serial.println("Ready");
+}
+
+void loop() {
+  // Your main loop logic goes here
+  delay(500); // Stability delay
+}
+
+void receiveEvent(int howMany) {
+  String command = "";
+  while (Wire.available()) {
+    char c = Wire.read();
+    command += c;
+  }
+  Serial.println("Command Received: " + command);
+
+  // Split the command string into individual commands
+  int pos = 0;
+  while (pos < command.length()) {
+    String singleCommand = command.substring(pos, pos + 1);
+    executeCommand(singleCommand);
+    pos++;
+  }
+}
+
+void executeCommand(String command) {
+  char dir = command.charAt(0);
+  int value = command.substring(1).toInt();
+
+  switch (dir) {
+    case '2':
+      moveForward(3);
+      break;
+    case '8':
+      moveBackward(3);
+      break;
+    case '9':
+      turnLeft(150), moveForward(1),turnRight(130);
+      break;
+    case '7':
+      turnRight(100), moveForward(1),turnLeft(130);
+      break;
+    case '6':
+      turnRight(150), moveForward(2),turnLeft(130);
+      break;
+    case '4':
+      turnLeft(100), moveForward(2),turnRight(130);
+      break;
+       case '0':
+       moveForward(1);
+      break;
+      case '5':
+       moveForward(2);
+      break;
+    default:
+      // Handle unknown command
+      break;
+  }
+}
+
+void moveForward(int value) {
+  setMotorsDirection(true);
+  ledcWrite(ledChannelA, 115);
+  ledcWrite(ledChannelB, 115);
+  delay(1000 * value); // Adjust based on speed and required distance
+  stopMotors();
+}
+
+void moveBackward(int value) {
+  setMotorsDirection(false);
+  ledcWrite(ledChannelA, 115);
+  ledcWrite(ledChannelB, 115);
+  delay(1000 * value); // Adjust based on speed and required distance
+  stopMotors();
+}
+
+void turnLeft(int angle) {
+  Serial.print("Turning Left ");
+  Serial.print(angle);
+  Serial.println(" degrees");
+  int dutyCycle = angleToDutyCycle(angle);
+  ledcWrite(servoChannel, dutyCycle);
+  delay(500); // Delay for turning
+  stopMotors();
+}
+
+void turnRight(int angle) {
+  Serial.print("Turning Right ");
+  Serial.print(angle);
+  Serial.println(" degrees");
+  int dutyCycle = angleToDutyCycle(angle);
+  ledcWrite(servoChannel, dutyCycle);
+  delay(500); // Delay for turning
+  stopMotors();
+}
+
+void setMotorsDirection(bool forward) {
+  if (forward) {
+    digitalWrite(INa, HIGH);
+    digitalWrite(INb, LOW);
+    digitalWrite(INc, HIGH);
+    digitalWrite(INd, LOW);
+  } else {
+    digitalWrite(INa, LOW);
+    digitalWrite(INb, HIGH);
+    digitalWrite(INc, LOW);
+    digitalWrite(INd, HIGH);
+  }
+}
+
+int angleToDutyCycle(int angle) {
+  int minDuty = 102; // Corresponds to 0 degrees
+  int maxDuty = 512; // Corresponds to 180 degrees
+  return map(angle, 0, 180, minDuty, maxDuty);
+}
+
+void stopMotors() {
+  digitalWrite(INa, LOW);
+  digitalWrite(INb, LOW);
+  digitalWrite(INc, LOW);
+  digitalWrite(INd, LOW);
+  ledcWrite(ledChannelA, 0);
+  ledcWrite(ledChannelB, 0);
+}
